@@ -39,6 +39,17 @@ names, room IDs, staff roles) to your licence and site.
 | Weekly | [weekly-checklist.md](checklists/weekly-checklist.md) | Deeper cleaning, IPM scouting, mother/veg work, stock |
 | Monthly | [monthly-checklist.md](checklists/monthly-checklist.md) | Deep sanitation, calibration, compliance, maintenance |
 
+### Ops brain (`/brain`)
+
+[`brain/index.html`](brain/index.html) is a single-file, offline visual map of the
+facility's operating domains — climate, irrigation, IPM, harvest, compliance and
+the rest — arranged around a central core. Open it in any browser (no build step,
+no network); tap a node to see who owns it and which SOP governs it.
+
+> The readouts on each node are **illustrative sample values**, not live telemetry.
+> Nothing here reads a sensor. Treat it as a wall display and an index into the
+> SOPs, not as a source of record.
+
 ### Detailed SOPs (`/sops`)
 | SOP | File |
 |---|---|

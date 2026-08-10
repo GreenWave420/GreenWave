@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GreenWave — Ops Brain</title>
+</head>
+<body>
+<!-- FRAGMENT:START -->
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #01060f;
+    color: #cfe6ff;
+    overflow: hidden;
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; }
+
+  .hud { position: fixed; z-index: 2; pointer-events: none; user-select: none; }
+
+  /* ---- top left: conditions + greeting + ticker ---- */
+  #hud-tl { top: max(18px, env(safe-area-inset-top)); left: 18px; max-width: min(46vw, 420px); }
+  .temp {
+    font: 600 26px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    color: #9fe2ff; letter-spacing: .01em;
+    text-shadow: 0 0 18px rgba(60,190,255,.45);
+  }
+  .place {
+    margin-top: 5px;
+    font: 600 10px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .18em; color: #5d87b8; text-transform: uppercase;
+  }
+  .greet {
+    margin-top: 14px;
+    font: 600 10px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .18em; color: #7fb6e8; text-transform: uppercase;
+  }
+  #ticker {
+    margin-top: 10px; min-height: 3.2em;
+    font: 400 11.5px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #6f9ac9;
+    transition: opacity .55s ease;
+  }
+
+  /* ---- top right: clock ---- */
+  #hud-tr { top: max(18px, env(safe-area-inset-top)); right: 18px; text-align: right; }
+  .clock {
+    font: 600 22px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    color: #ffd66b; letter-spacing: .04em;
+    text-shadow: 0 0 20px rgba(255,190,40,.35);
+  }
+  .date {
+    margin-top: 6px;
+    font: 600 10px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .16em; color: #7d6a3e; text-transform: uppercase;
+  }
+  .sysline {
+    margin-top: 12px;
+    font: 600 9.5px/1.7 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .14em; color: #4f7ba9; text-transform: uppercase;
+  }
+  .sysline b { color: #7fe0b0; font-weight: 600; }
+
+  /* ---- bottom right: brand ---- */
+  #hud-br {
+    right: 18px; bottom: max(16px, env(safe-area-inset-bottom));
+    text-align: right;
+    font: 600 9.5px/1.7 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .16em; color: #3f6a97; text-transform: uppercase;
+  }
+  #hud-br .hint { color: #2e5479; }
+  #hud-br { transition: opacity .3s ease; }
+  body.inspecting #hud-br { opacity: 0; }
+
+  /* ---- node detail panel ---- */
+  #panel {
+    position: fixed; z-index: 3;
+    left: 18px; bottom: max(16px, env(safe-area-inset-bottom));
+    width: min(340px, calc(100vw - 36px));
+    padding: 16px 18px 17px;
+    border: 1px solid rgba(90,160,225,.28);
+    border-radius: 14px;
+    background: linear-gradient(160deg, rgba(8,26,50,.92), rgba(4,14,30,.94));
+    box-shadow: 0 20px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(140,200,255,.09);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    opacity: 0; transform: translateY(14px) scale(.98);
+    transition: opacity .3s ease, transform .3s cubic-bezier(.2,.8,.3,1);
+    pointer-events: none;
+  }
+  #panel.on { opacity: 1; transform: none; pointer-events: auto; }
+  #panel h2 {
+    margin: 0; font: 600 17px/1.2 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #eaf5ff; letter-spacing: .01em;
+  }
+  .chips { display: flex; gap: 7px; align-items: center; margin-top: 9px; flex-wrap: wrap; }
+  .chip {
+    font: 600 9px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .16em; text-transform: uppercase;
+    padding: 5px 8px; border-radius: 999px;
+    border: 1px solid currentColor;
+  }
+  .chip.live    { color: #ffc21a; background: rgba(255,194,26,.09); }
+  .chip.online  { color: #4fd2ff; background: rgba(79,210,255,.08); }
+  .chip.idle    { color: #6d8fb5; background: rgba(109,143,181,.07); }
+  .chip.plain   { color: #7fb6e8; border-color: rgba(127,182,232,.35); }
+  #panel .desc {
+    margin: 12px 0 0;
+    font: 400 12.5px/1.55 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #9dc3e6;
+  }
+  .readout {
+    margin-top: 13px; padding-top: 12px;
+    border-top: 1px solid rgba(90,160,225,.16);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
+  }
+  .readout div { min-width: 0; }
+  .readout .k {
+    font: 600 8.5px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .16em; text-transform: uppercase; color: #5d87b8;
+  }
+  .readout .v {
+    margin-top: 3px;
+    font: 600 14px/1.2 ui-monospace, "SF Mono", Menlo, monospace;
+    color: #ffd97a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .srcline {
+    margin-top: 14px; padding-top: 11px;
+    border-top: 1px solid rgba(90,160,225,.16);
+    font: 400 10.5px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+    color: #5d87b8; word-break: break-all;
+  }
+  .srcline span { color: #7fe0b0; }
+  #panel .x {
+    position: absolute; top: 10px; right: 10px;
+    width: 26px; height: 26px; border-radius: 8px;
+    border: 1px solid rgba(90,160,225,.25); background: transparent;
+    color: #7fb6e8; font: 400 15px/1 ui-sans-serif, sans-serif;
+    cursor: pointer; display: grid; place-items: center;
+  }
+  #panel .x:hover { background: rgba(90,160,225,.12); color: #eaf5ff; }
+
+  @media (max-width: 720px) {
+    #hud-tl { max-width: 54vw; left: 14px; }
+    #hud-tr { right: 14px; }
+    .wide { display: none; }
+    .temp { font-size: 20px; }
+    .place, .greet { font-size: 8.5px; letter-spacing: .14em; }
+    .greet { margin-top: 9px; }
+    .clock { font-size: 17px; }
+    .date, .sysline { font-size: 8.5px; }
+    .sysline { margin-top: 7px; }
+    #ticker { font-size: 10.5px; margin-top: 7px; min-height: 4.4em; }
+    #hud-br { font-size: 8.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #panel { transition: none; }
+  }
+</style>
+
+<div id="stage"><canvas id="c"></canvas></div>
+
+<div class="hud" id="hud-tl">
+  <div class="temp" id="temp">23.4°C</div>
+  <div class="place">Greenwave · site a<span class="wide"> — flower block b</span></div>
+  <div class="greet" id="greet">Good evening</div>
+  <div id="ticker"></div>
+</div>
+
+<div class="hud" id="hud-tr">
+  <div class="clock" id="clock">--:--</div>
+  <div class="date" id="date"></div>
+  <div class="sysline">Nodes <b id="nodecount">18</b> · Live <b id="livecount">6</b></div>
+  <div class="sysline">Link <b>nominal</b></div>
+</div>
+
+<div class="hud" id="hud-br">
+  <div>Greenwave ops brain</div>
+  <div class="hint" id="hint">Tap a node to inspect</div>
+</div>
+
+<div id="panel" role="dialog" aria-live="polite">
+  <button class="x" id="panel-close" aria-label="Close">✕</button>
+  <h2 id="p-name">—</h2>
+  <div class="chips">
+    <span class="chip" id="p-status">—</span>
+    <span class="chip plain" id="p-owner">—</span>
+  </div>
+  <p class="desc" id="p-desc"></p>
+  <div class="readout" id="p-readout"></div>
+  <div class="srcline" id="p-src"></div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const COL = {
+    gold:   [255, 194,  26],
+    goldLt: [255, 231, 150],
+    cyan:   [ 79, 210, 255],
+    blue:   [ 74, 150, 232],
+    dim:    [ 60, 110, 170],
+  };
+  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+  // ---------------------------------------------------------------- nodes
+  // angle: degrees CCW from +x. r: fraction of the layout ellipse.
+  const NODES = [
+    { name: 'Drying & Cure', angle:   8, r: .72, status: 'idle',
+      owner: 'GM', sop: 'sops/trimming-and-harvest.md',
+      desc: 'Dry room hold at 16–20 °C / 55–62 % RH until stems snap, then into cure.',
+      read: [['Room temp','°C',17.8,.2],['Room RH','%',59,.6],['Day of dry','d',0,0,'—']] },
+
+    { name: 'Harvest', angle:  30, r: .92, status: 'live',
+      owner: 'GM · CT', sop: 'sops/trimming-and-harvest.md',
+      desc: 'Wet-trim line running. Batch IDs assigned at cut; weights logged per plant.',
+      read: [['Batch','',0,0,'GW-24-B7'],['Plants cut','',0,0,'42 / 60'],['Wet weight','kg',88.4,.4]] },
+
+    { name: 'Nutrients', angle:  52, r: .66, status: 'online',
+      owner: 'CT', sop: 'sops/mother-plant-maintenance.md',
+      desc: 'Stock tanks mixed to schedule. pH and EC verified before every irrigation event.',
+      read: [['Solution pH','',5.98,.04],['Feed EC','mS/cm',2.1,.03],['Tank level','%',72,.4]] },
+
+    { name: 'Irrigation', angle:  75, r: .88, status: 'live',
+      owner: 'CT', sop: 'sops/mother-plant-maintenance.md',
+      desc: 'Six shots/day in flower. Runoff EC checked daily against feed to track build-up.',
+      read: [['Shots today','',0,0,'4 / 6'],['Runoff EC','mS/cm',2.6,.05],['Source EC','mS/cm',0.28,.01]] },
+
+    { name: 'Climate', angle: 100, r: .64, status: 'live',
+      owner: 'GM', sop: 'README.md',
+      desc: 'Late-flower setpoints. VPD held in band by leading with RH, not temperature.',
+      read: [['Temp','°C',22.6,.15],['RH','%',47,.5],['CO₂','ppm',940,12],['VPD','kPa',1.31,.02]] },
+
+    { name: 'IPM', angle: 122, r: .86, status: 'live',
+      owner: 'IPM', sop: 'sops/integrated-pest-management.md',
+      desc: 'Weekly scouting round in progress. Sticky cards read and dated; thresholds tracked.',
+      read: [['Cards read','',0,0,'18 / 24'],['Thrips/card','',2.4,.3],['Open actions','',0,0,'2']] },
+
+    { name: 'Propagation', angle: 145, r: .70, status: 'online',
+      owner: 'CT', sop: 'sops/mother-plant-maintenance.md',
+      desc: 'Cuttings under dome at high RH. Rooting checked at day 10 before transplant.',
+      read: [['Cuttings','',0,0,'240'],['Dome RH','%',88,.5],['Strike rate','%',93,.3]] },
+
+    { name: 'Genetics', angle: 168, r: .94, status: 'idle',
+      owner: 'GM', sop: 'sops/mother-plant-maintenance.md',
+      desc: 'Cultivar register and mother lineage. No active selection round this cycle.',
+      read: [['Cultivars','',0,0,'7'],['Mothers held','',0,0,'14'],['Last audit','',0,0,'31 d ago']] },
+
+    { name: 'Mothers', angle: 190, r: .76, status: 'online',
+      owner: 'GM · CT', sop: 'sops/mother-plant-maintenance.md',
+      desc: 'Mother stock on 18/6. Topped and defoliated on rotation to hold cutting yield.',
+      read: [['Room temp','°C',23.9,.15],['RH','%',60,.5],['Next take','',0,0,'in 3 d']] },
+
+    { name: 'Veg Rooms', angle: 212, r: .96, status: 'online',
+      owner: 'CT', sop: 'sops/facility-tidying.md',
+      desc: 'Veg benches at target VPD. Plants sized and spaced ahead of flip.',
+      read: [['Temp','°C',24.4,.15],['RH','%',62,.5],['Days to flip','',0,0,'6']] },
+
+    { name: 'Flower Rooms', angle: 234, r: .68, status: 'live',
+      owner: 'GM', sop: 'README.md',
+      desc: 'Three rooms in flower. Room 2 at day 54 — late-flower RH pulled down for finish.',
+      read: [['Rooms active','',0,0,'3'],['Oldest','d',0,0,'day 54'],['Canopy RH','%',46,.5]] },
+
+    { name: 'Sanitation', angle: 252, r: .90, status: 'online',
+      owner: 'QA', sop: 'sops/cleaning-and-sanitation.md',
+      desc: 'Clean-as-you-go plus scheduled deep sanitation between batches. Logs signed daily.',
+      read: [['Rooms cleaned','',0,0,'5 / 6'],['Sanitiser','',0,0,'in date'],['Swabs due','',0,0,'4 d']] },
+
+    { name: 'Waste', angle: 270, r: .62, status: 'idle',
+      owner: 'QA · RP', sop: 'sops/cleaning-and-sanitation.md',
+      desc: 'Green waste held in secured bin pending witnessed destruction and dual sign-off.',
+      read: [['Held','kg',31.2,.2],['Next destruction','',0,0,'Fri'],['Witness','',0,0,'RP']] },
+
+    { name: 'Housekeeping', angle: 288, r: .86, status: 'idle',
+      owner: 'CT', sop: 'sops/facility-tidying.md',
+      desc: 'Corridors and prep benches cleared. Tools returned to shadow boards at shift end.',
+      read: [['Zones clear','',0,0,'7 / 8'],['Tools out','',0,0,'1'],['Last sweep','',0,0,'2 h ago']] },
+
+    { name: 'Security', angle: 306, r: .70, status: 'online',
+      owner: 'RP', sop: 'README.md',
+      desc: 'Perimeter and vault monitored. Access events reconciled against the visitor log.',
+      read: [['Doors secure','',0,0,'12 / 12'],['Cameras','',0,0,'online'],['Visitors','',0,0,'0']] },
+
+    { name: 'Compliance', angle: 324, r: .94, status: 'live',
+      owner: 'QA · RP', sop: 'README.md',
+      desc: 'GACP records current. Batch documents assembled as each room finishes.',
+      read: [['Records open','',0,0,'3'],['Retention','',0,0,'ok'],['Next review','',0,0,'21 d']] },
+
+    { name: 'Inventory', angle: 340, r: .68, status: 'online',
+      owner: 'GM', sop: 'README.md',
+      desc: 'Plant counts and dry stock reconciled. Variance investigated same day.',
+      read: [['Plants','',0,0,'1,284'],['Dry on hand','kg',54.6,.2],['Variance','%',0.2,.02]] },
+
+    { name: 'QA / Lab', angle: 355, r: .90, status: 'online',
+      owner: 'QA', sop: 'README.md',
+      desc: 'Samples pulled per batch for potency and micro. Release held pending results.',
+      read: [['Samples out','',0,0,'2'],['Results due','',0,0,'5 d'],['Holds','',0,0,'1']] },
+  ];
+
+  const MESH = [
+    ['Climate','Irrigation'], ['Irrigation','Nutrients'], ['IPM','Flower Rooms'],
+    ['Harvest','Drying & Cure'], ['Drying & Cure','QA / Lab'], ['QA / Lab','Compliance'],
+    ['Compliance','Inventory'], ['Compliance','Security'], ['Mothers','Propagation'],
+    ['Propagation','Genetics'], ['Veg Rooms','Flower Rooms'], ['Flower Rooms','Climate'],
+    ['Sanitation','Housekeeping'], ['Waste','Sanitation'], ['Harvest','Inventory'],
+    ['Mothers','Veg Rooms'], ['IPM','Veg Rooms'],
+  ];
+
+  const byName = new Map(NODES.map(n => [n.name, n]));
+
+  NODES.forEach(n => {
+    n.color = n.status === 'live' ? COL.gold : n.status === 'idle' ? COL.dim : COL.cyan;
+    n.glow = 0;          // 0..1 activity flash
+    n.hover = 0;         // 0..1 hover ease
+    n.seed = Math.random() * 1000;
+    n.pulses = [];
+    n.vals = n.read.map(r => r[2]);
+  });
+
+  const links = MESH
+    .map(([a, b]) => ({ a: byName.get(a), b: byName.get(b), pulses: [] }))
+    .filter(l => l.a && l.b);
+
+  // ---------------------------------------------------------------- sizing
+  let W = 0, H = 0, cx = 0, cy = 0, rx = 0, ry = 0, coreR = 0, scale = 1, labelFont = 13;
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const narrow = W < 720;
+    cx = W / 2;
+    cy = H / 2 + (H > 720 ? -10 : 0);
+    scale = Math.min(W, H) / 900;
+    rx = Math.min(W * (narrow ? 0.42 : 0.38), W / 2 - (narrow ? 56 : 78));
+    ry = Math.min(H * (narrow ? 0.38 : 0.34), H / 2 - 96);
+    coreR = Math.max(46, Math.min(W, H) * (narrow ? 0.135 : 0.115));
+    labelFont = narrow ? 11 : Math.max(11.5, 13 * Math.max(.82, scale * 1.05));
+
+    NODES.forEach(n => {
+      const a = n.angle * Math.PI / 180;
+      n.x = cx + Math.cos(a) * rx * n.r;
+      n.y = cy - Math.sin(a) * ry * n.r;
+      // control point for the core->node arc: perpendicular offset, organic sweep
+      const mx = (cx + n.x) / 2, my = (cy + n.y) / 2;
+      const dx = n.x - cx, dy = n.y - cy;
+      // always keep a minimum sweep so no spoke reads as a straight line
+      const s = Math.sin(n.seed);
+      const bend = (s < 0 ? -1 : 1) * (0.14 + 0.20 * Math.abs(s));
+      n.ctrl = { x: mx - dy * bend, y: my + dx * bend };
+      // spokes leave the orb's rim, not its centre
+      const len = Math.hypot(n.ctrl.x - cx, n.ctrl.y - cy) || 1;
+      const off = coreR * 1.12;
+      n.hub = { x: cx + (n.ctrl.x - cx) / len * off, y: cy + (n.ctrl.y - cy) / len * off };
+      n.side = Math.abs(dx) < rx * 0.22 ? (dy < 0 ? 'top' : 'bottom') : (dx < 0 ? 'left' : 'right');
+      n.rad = (n.status === 'idle' ? 6.5 : 8) * Math.max(.72, scale * 1.15);
+      n.labelDY = 0;
+    });
+
+    nudgeLabels();
+    buildFilaments();
+    buildTraces();
+    buildCore();
+  }
+
+  // Labels sharing a side can collide on narrow screens — push them apart,
+  // then re-centre the column so the whole group doesn't drift downward.
+  function nudgeLabels() {
+    const lh = labelFont * 1.55;
+    for (const side of ['left', 'right']) {
+      const arr = NODES.filter(n => n.side === side).sort((a, b) => a.y - b.y);
+      for (let i = 1; i < arr.length; i++) {
+        const gap = (arr[i].y + arr[i].labelDY) - (arr[i - 1].y + arr[i - 1].labelDY);
+        if (gap < lh) arr[i].labelDY += lh - gap;
+      }
+      const total = arr.length ? arr[arr.length - 1].labelDY : 0;
+      if (total) arr.forEach(n => { n.labelDY -= total / 2; });
+    }
+  }
+
+  // ---------------------------------------------------------- background art
+  let filaments = [], traces = [], coreParticles = [];
+
+  function buildFilaments() {
+    filaments = [];
+    const n = W < 640 ? 26 : 44;
+    for (let i = 0; i < n; i++) {
+      const y0 = cy + (Math.random() - .5) * H * 0.85;
+      const y1 = cy + (Math.random() - .5) * H * 0.85;
+      filaments.push({
+        x0: -W * 0.1, y0,
+        x1: W * 1.1, y1,
+        c1x: cx - rx * (0.3 + Math.random() * 0.8), c1y: cy + (Math.random() - .5) * H * 0.7,
+        c2x: cx + rx * (0.3 + Math.random() * 0.8), c2y: cy + (Math.random() - .5) * H * 0.7,
+        amp: 8 + Math.random() * 34,
+        sp: 0.12 + Math.random() * 0.4,
+        ph: Math.random() * Math.PI * 2,
+        a: 0.05 + Math.random() * 0.13,
+      });
+    }
+  }
+
+  // stepped PCB-style traces running off the edges behind the nodes
+  function buildTraces() {
+    traces = [];
+    NODES.forEach((n, i) => {
+      if (i % 3 === 1) return;
+      const toLeft = n.x < cx;
+      const edge = toLeft ? -20 : W + 20;
+      const knee = n.x + (toLeft ? -1 : 1) * (40 + (i % 4) * 34) * Math.max(.7, scale);
+      const drop = n.y + ((i % 2) ? 1 : -1) * (34 + (i % 5) * 26) * Math.max(.7, scale);
+      traces.push({ pts: [[n.x, n.y], [knee, n.y], [knee, drop], [edge, drop]], ph: Math.random() * 6 });
+    });
+  }
+
+  function buildCore() {
+    coreParticles = [];
+    const n = W < 640 ? 190 : 300;
+    for (let i = 0; i < n; i++) {
+      // even-ish distribution on a sphere
+      const u = Math.random() * 2 - 1;
+      const t = Math.random() * Math.PI * 2;
+      const s = Math.sqrt(1 - u * u);
+      coreParticles.push({
+        x: s * Math.cos(t), y: u, z: s * Math.sin(t),
+        r: 0.62 + Math.random() * 0.38,
+        tw: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------- helpers
+  const qbez = (p0, c, p1, t) => {
+    const it = 1 - t;
+    return {
+      x: it * it * p0.x + 2 * it * t * c.x + t * t * p1.x,
+      y: it * it * p0.y + 2 * it * t * c.y + t * t * p1.y,
+    };
+  };
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = (v, target, k) => v + (target - v) * k;
+
+  // ---------------------------------------------------------------- state
+  let hovered = null, selected = null;
+  let speaking = 1, voiceAmp = 0.35, tPrev = performance.now();
+  const pointer = { x: -999, y: -999, on: false };
+
+  function spawnPulse(node, dir) {
+    node.pulses.push({ t: dir > 0 ? 0 : 1, dir, sp: 0.28 + Math.random() * 0.3, a: 1 });
+  }
+
+  // periodic "thinking": a node lights up and fires toward the core
+  let nextThink = 0;
+  function think(now) {
+    if (now < nextThink) return;
+    nextThink = now + 700 + Math.random() * 1500;
+    const pool = NODES.filter(n => n.status !== 'idle');
+    const n = pool[(Math.random() * pool.length) | 0];
+    n.glow = 1;
+    const bursts = 1 + ((Math.random() * 3) | 0);
+    for (let i = 0; i < bursts; i++) spawnPulse(n, -1);
+    if (Math.random() < .45) {
+      const l = links[(Math.random() * links.length) | 0];
+      l.pulses.push({ t: 0, sp: 0.3 + Math.random() * 0.35, a: 1 });
+    }
+  }
+
+  // ---------------------------------------------------------------- drawing
+  function drawBackdrop(t) {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.66);
+    g.addColorStop(0, '#0b3766');
+    g.addColorStop(.34, '#062244');
+    g.addColorStop(.72, '#031328');
+    g.addColorStop(1, '#01060f');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // faint horizon band, like the screen's own bloom
+    const b = ctx.createLinearGradient(0, cy - ry * 1.5, 0, cy + ry * 1.5);
+    b.addColorStop(0, 'rgba(10,60,120,0)');
+    b.addColorStop(.5, 'rgba(24,100,185,.13)');
+    b.addColorStop(1, 'rgba(10,60,120,0)');
+    ctx.fillStyle = b;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawFilaments(t) {
+    ctx.lineWidth = 1;
+    for (const f of filaments) {
+      const w = Math.sin(t * f.sp + f.ph) * f.amp;
+      ctx.beginPath();
+      ctx.moveTo(f.x0, f.y0 + w);
+      ctx.bezierCurveTo(f.c1x, f.c1y + w, f.c2x, f.c2y - w, f.x1, f.y1 - w);
+      // fade the strands out at the edges so they read as passing through the core
+      const g = ctx.createLinearGradient(f.x0, 0, f.x1, 0);
+      g.addColorStop(0, rgba(COL.blue, 0));
+      g.addColorStop(.28, rgba(COL.blue, f.a));
+      g.addColorStop(.5, rgba(COL.blue, f.a * 1.7));
+      g.addColorStop(.72, rgba(COL.blue, f.a));
+      g.addColorStop(1, rgba(COL.blue, 0));
+      ctx.strokeStyle = g;
+      ctx.stroke();
+    }
+  }
+
+  function drawTraces(t) {
+    ctx.lineWidth = 1;
+    for (const tr of traces) {
+      ctx.beginPath();
+      ctx.moveTo(tr.pts[0][0], tr.pts[0][1]);
+      for (let i = 1; i < tr.pts.length; i++) ctx.lineTo(tr.pts[i][0], tr.pts[i][1]);
+      ctx.strokeStyle = rgba(COL.blue, .16);
+      ctx.stroke();
+
+      // travelling spark along the trace
+      const p = (t * 0.09 + tr.ph / 6) % 1;
+      const seg = p * (tr.pts.length - 1);
+      const i = Math.min(tr.pts.length - 2, seg | 0);
+      const ft = seg - i;
+      const x = lerp(tr.pts[i][0], tr.pts[i + 1][0], ft);
+      const y = lerp(tr.pts[i][1], tr.pts[i + 1][1], ft);
+      ctx.fillStyle = rgba(COL.cyan, .5);
+      ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 7); ctx.fill();
+
+      const e = tr.pts[tr.pts.length - 1];
+      ctx.fillStyle = rgba(COL.blue, .35);
+      ctx.beginPath(); ctx.arc(e[0], e[1], 2, 0, 7); ctx.fill();
+    }
+  }
+
+  function drawSpokes(t) {
+    for (const n of NODES) {
+      const active = Math.max(n.glow, n.hover, selected === n ? 1 : 0);
+      const base = (n.status === 'idle' ? 0.20 : 0.32) + active * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(n.hub.x, n.hub.y);
+      ctx.quadraticCurveTo(n.ctrl.x, n.ctrl.y, n.x, n.y);
+      ctx.lineWidth = 1 + active * 0.9;
+      // dim where it leaves the orb, brightest as it arrives at the node
+      const lg = ctx.createLinearGradient(n.hub.x, n.hub.y, n.x, n.y);
+      lg.addColorStop(0, rgba(n.color, base * 0.35));
+      lg.addColorStop(1, rgba(n.color, base));
+      ctx.strokeStyle = lg;
+      ctx.stroke();
+
+      // pulses travelling the spoke
+      for (const p of n.pulses) {
+        const pt = qbez(n.hub, n.ctrl, n, p.t);
+        const g = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, 9);
+        g.addColorStop(0, rgba(n.color, .95 * p.a));
+        g.addColorStop(1, rgba(n.color, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, 9, 0, 7); ctx.fill();
+        ctx.fillStyle = rgba(COL.goldLt, .9 * p.a);
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.7, 0, 7); ctx.fill();
+      }
+    }
+  }
+
+  function drawMesh(t) {
+    for (const l of links) {
+      const a = l.a, b = l.b;
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const cxx = lerp(mx, cx, .34), cyy = lerp(my, cy, .34);
+      const active = Math.max(a.hover, b.hover, selected === a || selected === b ? .8 : 0);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.quadraticCurveTo(cxx, cyy, b.x, b.y);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = rgba(COL.blue, .1 + active * .35);
+      ctx.stroke();
+
+      for (const p of l.pulses) {
+        const pt = qbez(a, { x: cxx, y: cyy }, b, p.t);
+        ctx.fillStyle = rgba(COL.cyan, .8 * p.a);
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.8, 0, 7); ctx.fill();
+      }
+    }
+  }
+
+  function drawCore(t) {
+    const breathe = 1 + Math.sin(t * 1.1) * 0.022 + voiceAmp * 0.05;
+    const R = coreR * breathe;
+
+    // outer bloom
+    const g = ctx.createRadialGradient(cx, cy, R * 0.15, cx, cy, R * 2.3);
+    g.addColorStop(0, rgba(COL.gold, .30));
+    g.addColorStop(.35, rgba(COL.gold, .10));
+    g.addColorStop(1, 'rgba(255,194,26,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 2.3, 0, 7); ctx.fill();
+
+    // inner fill
+    const g2 = ctx.createRadialGradient(cx - R * .2, cy - R * .25, R * .05, cx, cy, R);
+    g2.addColorStop(0, 'rgba(255,240,190,.42)');
+    g2.addColorStop(.55, 'rgba(255,186,20,.16)');
+    g2.addColorStop(1, 'rgba(255,150,10,.03)');
+    ctx.fillStyle = g2;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
+
+    // particle sphere
+    const rot = t * (reduceMotion ? 0.04 : 0.16);
+    const tilt = 0.42;
+    ctx.save();
+    for (const p of coreParticles) {
+      const x = p.x * Math.cos(rot) - p.z * Math.sin(rot);
+      const z = p.x * Math.sin(rot) + p.z * Math.cos(rot);
+      const y = p.y * Math.cos(tilt) - z * Math.sin(tilt) * 0.35;
+      const depth = (z + 1) / 2;
+      const px = cx + x * R * 0.94;
+      const py = cy + y * R * 0.94;
+      const tw = 0.55 + 0.45 * Math.sin(t * 2.4 + p.tw);
+      ctx.fillStyle = rgba(COL.goldLt, (0.14 + depth * 0.6) * tw * 0.85);
+      ctx.beginPath();
+      ctx.arc(px, py, (0.6 + depth * 1.5) * p.r, 0, 7);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // rings
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = rgba(COL.gold, .75);
+    ctx.shadowColor = rgba(COL.gold, .8);
+    ctx.shadowBlur = 22;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.16, 0, 7); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 7]);
+    ctx.strokeStyle = rgba(COL.gold, .30);
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.42, 0, 7); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // sweeping arc riding the main ring
+    const sw = (t * 0.55) % (Math.PI * 2);
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = rgba(COL.goldLt, .7);
+    ctx.shadowColor = rgba(COL.goldLt, .7);
+    ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.16, sw, sw + 0.7); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawNodes(t) {
+    for (const n of NODES) {
+      const active = Math.max(n.glow, n.hover, selected === n ? 1 : 0);
+      const R = n.rad * (1 + active * 0.35);
+
+      // halo
+      if (active > 0.01 || n.status === 'live') {
+        const hA = 0.10 + active * 0.35 + (n.status === 'live' ? 0.12 : 0);
+        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, R * 4);
+        g.addColorStop(0, rgba(n.color, hA));
+        g.addColorStop(1, rgba(n.color, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(n.x, n.y, R * 4, 0, 7); ctx.fill();
+      }
+
+      // expanding ping on live nodes
+      if (n.status !== 'idle') {
+        const ping = ((t * 0.5 + n.seed) % 1);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = rgba(n.color, (1 - ping) * 0.28);
+        ctx.beginPath(); ctx.arc(n.x, n.y, R + ping * R * 2.6, 0, 7); ctx.stroke();
+      }
+
+      // ring
+      ctx.lineWidth = 1.6;
+      if (n.status === 'idle') ctx.setLineDash([2.5, 3.5]);
+      ctx.strokeStyle = rgba(n.color, .55 + active * .45);
+      ctx.beginPath(); ctx.arc(n.x, n.y, R, 0, 7); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // hub
+      ctx.fillStyle = n.status === 'live'
+        ? rgba(COL.goldLt, .85)
+        : rgba(n.color, .25 + active * .55);
+      ctx.beginPath(); ctx.arc(n.x, n.y, R * (n.status === 'live' ? .42 : .34), 0, 7); ctx.fill();
+
+      // label
+      const pad = R + 11;
+      ctx.font = `600 ${labelFont}px ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif`;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0.02em';
+      ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(n.name).width;
+      let lx = n.x, ly = n.y + n.labelDY;
+      if (n.side === 'left')       { ctx.textAlign = 'right'; lx = Math.max(n.x - pad, tw + 8); }
+      else if (n.side === 'right') { ctx.textAlign = 'left';  lx = Math.min(n.x + pad, W - tw - 8); }
+      else { ctx.textAlign = 'center'; ly = n.y + (n.side === 'top' ? -pad - 4 : pad + 5); }
+
+      // leader line when the label had to be moved off its node
+      if (Math.abs(n.labelDY) > 5) {
+        ctx.beginPath();
+        ctx.moveTo(n.x + (n.side === 'left' ? -R - 2 : R + 2), n.y);
+        ctx.lineTo(lx + (n.side === 'left' ? 4 : -4), ly);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = rgba(n.color, .22 + active * .3);
+        ctx.stroke();
+      }
+
+      ctx.shadowColor = 'rgba(0,10,25,.95)';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = active > .05
+        ? '#ffffff'
+        : (n.status === 'idle' ? 'rgba(150,180,215,.72)' : 'rgba(216,236,255,.94)');
+      ctx.fillText(n.name, lx, ly);
+      ctx.shadowBlur = 0;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+    }
+  }
+
+  function drawVoice(t) {
+    const bars = W < 640 ? 34 : 52;
+    const bw = 2.4, gap = W < 640 ? 5.2 : 6.4;
+    const total = bars * gap;
+    const y = Math.min(H - 74, cy + ry * 1.06 + 40);
+    const x0 = cx - total / 2;
+
+    for (let i = 0; i < bars; i++) {
+      const f = i / (bars - 1);
+      const env = Math.sin(f * Math.PI) ** 1.4;
+      const wob =
+        Math.sin(t * 6.2 + i * 0.55) * 0.5 +
+        Math.sin(t * 3.1 + i * 0.22) * 0.3 +
+        Math.sin(t * 11.3 + i * 1.7) * 0.2;
+      const h = Math.max(1.5, (2 + Math.abs(wob) * 20 * env) * speaking * (0.55 + voiceAmp));
+      const a = 0.25 + env * 0.6 * speaking;
+      ctx.fillStyle = rgba(i % 7 === 0 ? COL.goldLt : COL.gold, a);
+      ctx.fillRect(x0 + i * gap, y - h, bw, h * 2);
+    }
+
+    ctx.font = '600 9px ui-monospace, "SF Mono", Menlo, monospace';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0.34em';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillStyle = rgba(COL.gold, .55 + 0.25 * Math.sin(t * 2));
+    ctx.fillText(speaking > .5 ? 'PROCESSING' : 'IDLE', cx + 2, y + 22);
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+
+    ctx.fillStyle = rgba(COL.gold, .35);
+    for (let i = 0; i < 3; i++) {
+      const a = 0.2 + 0.5 * (0.5 + 0.5 * Math.sin(t * 3 - i * 0.7));
+      ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.arc(cx + (i - 1) * 7, y + 38, 1.5, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------------------------------------------------------------- loop
+  function frame(now) {
+    const dt = Math.min(0.05, (now - tPrev) / 1000);
+    tPrev = now;
+    const t = now / 1000;
+
+    think(now);
+
+    voiceAmp = 0.3 + 0.25 * (0.5 + 0.5 * Math.sin(t * 1.7)) + 0.15 * Math.abs(Math.sin(t * 5.3));
+
+    // advance pulses
+    for (const n of NODES) {
+      n.glow = ease(n.glow, 0, dt * 2.2);
+      n.hover = ease(n.hover, hovered === n ? 1 : 0, dt * 9);
+      for (let i = n.pulses.length - 1; i >= 0; i--) {
+        const p = n.pulses[i];
+        p.t += p.dir * p.sp * dt;
+        if (p.t <= 0 || p.t >= 1) n.pulses.splice(i, 1);
+      }
+    }
+    for (const l of links) {
+      for (let i = l.pulses.length - 1; i >= 0; i--) {
+        const p = l.pulses[i];
+        p.t += p.sp * dt;
+        if (p.t >= 1) l.pulses.splice(i, 1);
+      }
+    }
+
+    ctx.clearRect(0, 0, W, H);
+    drawBackdrop(t);
+    drawFilaments(t);
+    drawTraces(t);
+    drawMesh(t);
+    drawSpokes(t);
+    drawCore(t);
+    drawNodes(t);
+    drawVoice(t);
+
+    requestAnimationFrame(frame);
+  }
+
+  // ---------------------------------------------------------------- input
+  function hitTest(x, y) {
+    let best = null, bd = Infinity;
+    for (const n of NODES) {
+      const d = Math.hypot(n.x - x, n.y - y);
+      if (d < 30 && d < bd) { bd = d; best = n; }
+    }
+    return best;
+  }
+
+  canvas.addEventListener('pointermove', e => {
+    pointer.x = e.clientX; pointer.y = e.clientY; pointer.on = true;
+    hovered = hitTest(e.clientX, e.clientY);
+    canvas.style.cursor = hovered ? 'pointer' : 'default';
+  });
+  canvas.addEventListener('pointerleave', () => { hovered = null; pointer.on = false; });
+
+  canvas.addEventListener('pointerdown', e => {
+    const n = hitTest(e.clientX, e.clientY);
+    if (n) {
+      select(n);
+      n.glow = 1;
+      for (let i = 0; i < 4; i++) spawnPulse(n, -1);
+    } else if (Math.hypot(e.clientX - cx, e.clientY - cy) < coreR * 1.4) {
+      // poke the core: everything reports in
+      NODES.forEach(node => { node.glow = 1; spawnPulse(node, 1); });
+      speaking = 1;
+    } else {
+      select(null);
+    }
+  });
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') select(null);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      const i = selected ? NODES.indexOf(selected) : -1;
+      const d = e.key === 'ArrowRight' ? 1 : -1;
+      select(NODES[(i + d + NODES.length) % NODES.length]);
+    }
+  });
+
+  // ------------------------------------------------------------- panel
+  const panel = document.getElementById('panel');
+  // show each reading to the precision its target value was written with
+  const decimals = v => (String(v).split('.')[1] || '').length;
+  const fmt = (v, unit, dp) => v.toFixed(dp) + (unit ? ' ' + unit : '');
+
+  function select(n) {
+    selected = n;
+    if (!n) {
+      panel.classList.remove('on');
+      document.body.classList.remove('inspecting');
+      return;
+    }
+    document.getElementById('p-name').textContent = n.name;
+    const st = document.getElementById('p-status');
+    st.textContent = n.status === 'live' ? 'Live' : n.status === 'idle' ? 'Idle' : 'Online';
+    st.className = 'chip ' + n.status;
+    document.getElementById('p-owner').textContent = n.owner;
+    document.getElementById('p-desc').textContent = n.desc;
+
+    const ro = document.getElementById('p-readout');
+    ro.innerHTML = '';
+    n.read.forEach((r, i) => {
+      const [key, unit, base, , text] = r;
+      const val = text !== undefined ? text : fmt(n.vals[i], unit, decimals(base));
+      const d = document.createElement('div');
+      d.innerHTML = '<div class="k"></div><div class="v"></div>';
+      d.querySelector('.k').textContent = key;
+      d.querySelector('.v').textContent = val;
+      ro.appendChild(d);
+    });
+    document.getElementById('p-src').innerHTML =
+      'Source of truth <span></span>';
+    document.getElementById('p-src').querySelector('span').textContent = n.sop;
+    panel.classList.add('on');
+    document.body.classList.add('inspecting');
+  }
+  document.getElementById('panel-close').addEventListener('click', () => select(null));
+
+  // drifting sensor values, so live readouts actually move
+  setInterval(() => {
+    NODES.forEach(n => {
+      n.read.forEach((r, i) => {
+        const [, , base, drift, text] = r;
+        if (text !== undefined || !drift) return;
+        const next = n.vals[i] + (Math.random() - .5) * drift * 2;
+        n.vals[i] = Math.max(base - drift * 3, Math.min(base + drift * 3, next));
+      });
+    });
+    if (selected) select(selected);
+  }, 3000);
+
+  // ------------------------------------------------------------- hud text
+  const TICKER = [
+    'Late flower holding 40–50 % RH — pull humidity before touching temperature.',
+    'Runoff EC logged daily in flower. Rising runoff means feed is outpacing uptake.',
+    'Sticky cards read weekly and dated. Two consecutive rises trips the IPM threshold.',
+    'Nutrient solution pH 5.8–6.2, checked at the emitter, not just at the tank.',
+    'If it isn’t recorded, it didn’t happen — log readings and corrective actions.',
+    'Green waste stays secured until destruction is witnessed and dual-signed.',
+    'Dry room 16–20 °C at 55–62 % RH until the small stems snap, then cure.',
+    'Clean as you go. Deep sanitation between every batch, signed on the room log.',
+  ];
+  let tick = 0;
+  const tickerEl = document.getElementById('ticker');
+  function cycleTicker() {
+    tickerEl.style.opacity = 0;
+    setTimeout(() => {
+      tickerEl.textContent = TICKER[tick++ % TICKER.length];
+      tickerEl.style.opacity = 1;
+    }, 550);
+  }
+  cycleTicker();
+  setInterval(cycleTicker, 7000);
+
+  function clockTick() {
+    const d = new Date();
+    const p = x => String(x).padStart(2, '0');
+    document.getElementById('clock').textContent = `${p(d.getHours())}:${p(d.getMinutes())}`;
+    document.getElementById('date').textContent = d.toLocaleDateString(undefined, {
+      weekday: 'short', day: 'numeric', month: 'short',
+    });
+    const h = d.getHours();
+    const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
+    document.getElementById('greet').textContent = `Good ${part} — facility online`;
+  }
+  clockTick();
+  setInterval(clockTick, 15000);
+
+  // room temperature readout in the corner drifts too
+  let temp = 22.6;
+  setInterval(() => {
+    temp = Math.max(21.4, Math.min(24.2, temp + (Math.random() - .5) * 0.3));
+    document.getElementById('temp').textContent = temp.toFixed(1) + '°C';
+  }, 4000);
+
+  document.getElementById('nodecount').textContent = NODES.length;
+  document.getElementById('livecount').textContent = NODES.filter(n => n.status === 'live').length;
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+<!-- FRAGMENT:END -->
+</body>
+</html>
