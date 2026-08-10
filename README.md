@@ -41,14 +41,35 @@ names, room IDs, staff roles) to your licence and site.
 
 ### Ops brain (`/brain`)
 
-[`brain/index.html`](brain/index.html) is a single-file, offline visual map of the
-facility's operating domains — climate, irrigation, IPM, harvest, compliance and
-the rest — arranged around a central core. Open it in any browser (no build step,
-no network); tap a node to see who owns it and which SOP governs it.
+[`brain/index.html`](brain/index.html) is a single-file visual map of the facility's
+operating domains — climate, irrigation, IPM, harvest, compliance and the rest —
+arranged around a central core. Tap a node to see who owns it and which SOP
+governs it.
 
 > The readouts on each node are **illustrative sample values**, not live telemetry.
 > Nothing here reads a sensor. Treat it as a wall display and an index into the
 > SOPs, not as a source of record.
+
+**Apex, the voice assistant.** The bar at the bottom talks to Claude or GPT
+(switch with the model chip). Type a question, or press the mic and speak — the
+waveform and the core follow your actual microphone level, and the reply is read
+back aloud. Apex is briefed with every node on the board, its owner, its governing
+SOP, and the target ranges below, so it answers about *this* facility.
+
+To use it:
+
+1. Serve the folder over `http://localhost` rather than opening the file directly —
+   microphone access and speech recognition need a secure context, and the API
+   calls need a real origin. Any static server works: `npx serve brain` or
+   `python3 -m http.server -d brain`.
+2. Click the gear and paste an Anthropic and/or OpenAI API key.
+
+> ⚠️ **Key handling.** There is no server in this project — the page calls the
+> provider directly from the browser, and your key is stored in that browser's
+> localStorage. Use a key issued for this purpose that you can revoke, and don't
+> enter one on a shared or public machine. Speech recognition also sends audio to
+> the browser vendor's service. If Apex is going on a shared floor terminal, put a
+> small proxy in front of it and hold the key server-side instead.
 
 ### Detailed SOPs (`/sops`)
 | SOP | File |
