@@ -1420,12 +1420,21 @@
       if (!speakingNow) setState('idle');
     } catch (err) {
       setState('idle');
+      // A blocked request and a CORS rejection are the same TypeError to JS, so
+      // report by where the page is running rather than guessing the cause.
       const offline = err.name === 'TypeError' || /Failed to fetch|NetworkError/i.test(err.message);
+      const localHost = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
       body.className = 'err';
-      body.textContent = offline
-        ? 'Could not reach the provider. If you are viewing the hosted page, outbound API ' +
-          'calls are blocked there — open brain/index.html from a local server instead.'
-        : 'Request failed: ' + err.message;
+      body.textContent = !offline
+        ? 'Request failed: ' + err.message
+        : localHost
+          ? 'The request never left the browser. That is a cross-origin rejection, an ' +
+            'offline network, or an extension blocking it — open the browser console ' +
+            '(F12) for the specific reason.'
+          : 'This copy is running on ' + (location.hostname || 'a local file') + ', where ' +
+            'outbound API calls are blocked. Serve the folder over http://localhost ' +
+            '(npx serve brain) and add your key there — keys are stored per-origin, so ' +
+            'they do not carry across.';
     } finally {
       inflight = null;
     }
