@@ -1181,7 +1181,7 @@
 
   // ---- speech in -----------------------------------------------------------
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recog = null, listening = false, audioCtx = null, micStream = null, meterRAF = 0;
+  let recog = null, listening = false, audioCtx = null, micStream = null, meterRAF = 0, watchdog = 0;
 
   if (!SR) {
     micBtn.disabled = true;
@@ -1227,6 +1227,7 @@
     recog.continuous = false;
 
     recog.onstart = () => {
+      clearTimeout(watchdog);
       listening = true;
       micBtn.classList.add('rec');
       setState('listening');
@@ -1243,21 +1244,38 @@
     };
     recog.onerror = e => {
       stopListening();
-      if (e.error !== 'aborted' && e.error !== 'no-speech') {
+      if (e.error === 'no-speech') showAnswer('', 'Didn\'t catch that — try again, or type it.', true);
+      else if (e.error !== 'aborted') {
         showAnswer('', 'Microphone error: ' + e.error + '. You can type instead.', true);
       }
     };
     recog.onend = () => stopListening();
 
     try { recog.start(); } catch { /* already started */ }
+
+    // start() can hang without firing start, error, or end — the speech service
+    // is a network dependency and simply may not come up. Don't leave the
+    // operator tapping a dead button.
+    clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      if (listening) return;
+      stopListening();
+      showAnswer('', 'Speech recognition did not start. It needs a network speech service ' +
+        'that this browser cannot reach — type your question instead.', true);
+    }, 2000);
   }
 
   function stopListening() {
+    clearTimeout(watchdog);
     listening = false;
     micBtn.classList.remove('rec');
     stopMeter();
     if (voice.state === 'listening') setState('idle');
-    if (recog) { try { recog.abort(); } catch { /* noop */ } recog = null; }
+    // clear the handle before aborting — abort() re-fires onend, which lands
+    // back here, and a non-null recog would abort in a loop
+    const r = recog;
+    recog = null;
+    if (r) { try { r.abort(); } catch { /* already stopped */ } }
   }
 
   // ---- providers -----------------------------------------------------------
