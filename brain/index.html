@@ -24,11 +24,30 @@
 
   /* ---- top left: conditions + greeting + ticker ---- */
   #hud-tl { top: max(18px, env(safe-area-inset-top)); left: 18px; max-width: min(46vw, 420px); }
+  .topline { display: flex; align-items: baseline; gap: 12px; }
   .temp {
-    font: 600 26px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    font: 600 15px/1 ui-monospace, "SF Mono", Menlo, monospace;
     color: #9fe2ff; letter-spacing: .01em;
-    text-shadow: 0 0 18px rgba(60,190,255,.45);
+    text-shadow: 0 0 14px rgba(60,190,255,.4);
   }
+  .eyebrow {
+    margin-top: 13px;
+    font: 600 8.5px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .2em; text-transform: uppercase; color: #4f7ba9;
+  }
+  .dots {
+    display: flex; align-items: center; gap: 6px; margin-top: 14px;
+    font: 600 8.5px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .16em; text-transform: uppercase; color: #6f9ac9;
+  }
+  .dots .dot {
+    width: 5px; height: 5px; border-radius: 999px;
+    background: #4f7ba9; margin-left: 6px;
+  }
+  .dots .dot:first-child { margin-left: 0; }
+  .dots .dot.gold { background: #ffc21a; box-shadow: 0 0 8px rgba(255,194,26,.7); }
+  .dots .dot.cyan { background: #4fd2ff; box-shadow: 0 0 8px rgba(79,210,255,.6); }
+  .dots .dot.on   { background: #7fe0b0; box-shadow: 0 0 8px rgba(127,224,176,.7); }
   .place {
     margin-top: 5px;
     font: 600 10px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
@@ -49,17 +68,12 @@
   /* ---- top right: clock ---- */
   #hud-tr { top: max(18px, env(safe-area-inset-top)); right: 18px; text-align: right; }
   .clock {
-    font: 600 22px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    font: 600 26px/1 ui-monospace, "SF Mono", Menlo, monospace;
     color: #ffd66b; letter-spacing: .04em;
     text-shadow: 0 0 20px rgba(255,190,40,.35);
   }
-  .date {
-    margin-top: 6px;
-    font: 600 10px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
-    letter-spacing: .16em; color: #7d6a3e; text-transform: uppercase;
-  }
   .sysline {
-    margin-top: 12px;
+    margin-top: 8px;
     font: 600 9.5px/1.7 ui-monospace, "SF Mono", Menlo, monospace;
     letter-spacing: .14em; color: #4f7ba9; text-transform: uppercase;
   }
@@ -143,14 +157,81 @@
   }
   #panel .x:hover { background: rgba(90,160,225,.12); color: #eaf5ff; }
 
+  /* ---- state pill, top centre ---- */
+  #state-pill {
+    position: fixed; z-index: 5;
+    top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    display: none; align-items: center; gap: 7px;
+    padding: 7px 14px; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(255,120,110,.45); background: rgba(40,12,14,.72);
+    color: #ffb0a6;
+    font: 600 9.5px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .18em; text-transform: uppercase;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  #state-pill.on { display: flex; }
+  #state-pill .dot {
+    width: 7px; height: 7px; border-radius: 999px; background: #ff6b5e;
+    animation: blip 1.6s ease-in-out infinite;
+  }
+  @keyframes blip { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { #state-pill .dot { animation: none; } }
+
+  /* ---- new chat, top right under the clock ---- */
+  #new-chat {
+    position: fixed; z-index: 5;
+    top: calc(max(16px, env(safe-area-inset-top)) + 96px); right: 18px;
+    padding: 7px 12px; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(90,160,225,.3); background: rgba(8,26,50,.7);
+    color: #a8cdee;
+    font: 600 9px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .16em; text-transform: uppercase;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  #new-chat:hover { background: rgba(90,160,225,.2); color: #fff; }
+
   /* ---- Apex voice dock ---- */
   #dock {
     position: fixed; z-index: 4;
     left: 50%; transform: translateX(-50%);
-    bottom: max(14px, env(safe-area-inset-bottom));
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 54px);
     width: min(660px, calc(100vw - 28px));
     display: flex; flex-direction: column; align-items: center; gap: 10px;
+    pointer-events: none;
   }
+  #dock > * { pointer-events: auto; }
+  #dock .bar { display: none; }
+  #dock .bar.on { display: flex; }
+
+  /* corner clusters, mirroring the reference layout */
+  .cluster {
+    position: fixed; z-index: 5;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    display: flex; gap: 8px; align-items: center;
+  }
+  #cluster-left { left: 18px; }
+  #cluster-right { right: 18px; }
+  .pill {
+    display: flex; align-items: center; gap: 7px;
+    padding: 9px 14px; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(90,160,225,.3);
+    background: linear-gradient(160deg, rgba(8,26,50,.9), rgba(4,14,30,.92));
+    color: #bcdcff;
+    font: 600 9.5px/1 ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: .14em; text-transform: uppercase;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    transition: background .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .pill:hover { background: rgba(90,160,225,.2); color: #fff; }
+  .pill:focus-visible { outline: 2px solid #4fd2ff; outline-offset: 2px; }
+  .pill.gold { border-color: rgba(255,194,26,.42); color: #ffd97a; }
+  .pill.gold:hover { background: rgba(255,194,26,.18); }
+  .pill.live {
+    border-color: rgba(79,210,255,.85); color: #061524;
+    background: #4fd2ff; box-shadow: 0 0 22px rgba(79,210,255,.5);
+  }
+  .pill[disabled] { opacity: .4; cursor: not-allowed; }
+  .pill .glyph { font-size: 12px; letter-spacing: 0; }
   #answer {
     width: 100%; max-height: 32vh; overflow-y: auto;
     padding: 14px 16px;
@@ -279,6 +360,9 @@
     .date, .sysline { font-size: 8.5px; }
     .sysline { margin-top: 7px; }
     #ticker { font-size: 10.5px; margin-top: 7px; min-height: 4.4em; }
+    .dots { display: none; }     /* would land on the node field */
+    .clock { font-size: 21px; }
+    #new-chat { top: calc(max(16px, env(safe-area-inset-top)) + 66px); font-size: 8px; }
     #hud-br { display: none; }   /* the dock owns the bottom of a phone screen */
     #answer { max-height: 40vh; font-size: 13px; }
   }
@@ -290,15 +374,22 @@
 <div id="stage"><canvas id="c"></canvas></div>
 
 <div class="hud" id="hud-tl">
-  <div class="temp" id="temp">23.4°C</div>
-  <div class="place">Greenwave · site a<span class="wide"> — flower block b</span></div>
+  <div class="topline">
+    <span class="clock" id="clock">--:--</span>
+    <span class="temp" id="temp">23.4°C</span>
+  </div>
+  <div class="place"><span id="date">—</span> · Greenwave site a<span class="wide"> — flower block b</span></div>
   <div class="greet" id="greet">Good evening</div>
+  <div class="eyebrow">Standing note</div>
   <div id="ticker"></div>
+  <div class="dots">
+    <span class="dot gold"></span>Apex
+    <span class="dot" id="link-dot"></span><span id="link-mode">Local</span>
+    <span class="dot cyan"></span>Voice
+  </div>
 </div>
 
 <div class="hud" id="hud-tr">
-  <div class="clock" id="clock">--:--</div>
-  <div class="date" id="date"></div>
   <div class="sysline">Nodes <b id="nodecount">18</b> · Live <b id="livecount">6</b></div>
   <div class="sysline">Link <b>nominal</b></div>
 </div>
@@ -308,15 +399,28 @@
   <div class="hint" id="hint">Tap a node · ask Apex below</div>
 </div>
 
+<button id="state-pill" aria-live="polite" title="Tap to stop">
+  <span class="dot"></span><span id="state-text">Listening — tap to stop</span>
+</button>
+
+<button id="new-chat" title="Clear the conversation">+ New chat</button>
+
 <div id="dock">
   <div id="answer" aria-live="polite"></div>
-  <div class="bar">
-    <button class="icon-btn" id="mic" aria-label="Hold a conversation by voice" title="Talk to Apex">🎙</button>
+  <div class="bar" id="chatbar">
     <input id="ask" type="text" autocomplete="off" spellcheck="false"
            placeholder="Ask Apex about the facility…" aria-label="Ask Apex">
-    <button class="who-chip" id="who" title="Switch model">Claude</button>
-    <button class="icon-btn" id="cfg-open" aria-label="Settings" title="API keys and models">⚙</button>
   </div>
+</div>
+
+<div class="cluster" id="cluster-left">
+  <button class="pill" id="chat-toggle"><span class="glyph">💬</span>Chat</button>
+  <button class="pill gold" id="mic" aria-label="Talk to Apex"><span class="glyph">🎙</span><span id="mic-label">Voice on</span></button>
+</div>
+
+<div class="cluster" id="cluster-right">
+  <button class="pill" id="who" title="Switch model">Claude</button>
+  <button class="pill" id="cfg-open" aria-label="Settings" title="Keys and models"><span class="glyph">⚙</span>EN</button>
 </div>
 
 <div id="cfg" role="dialog" aria-modal="true" aria-labelledby="cfg-title">
@@ -561,21 +665,24 @@
   // ---------------------------------------------------------- background art
   let filaments = [], traces = [], coreParticles = [];
 
+  // Long ribbons that cross the whole frame and bend around the core, as if it
+  // sat in a flow field. This is the dominant texture of the display.
   function buildFilaments() {
     filaments = [];
-    const n = W < 640 ? 16 : 26;
+    const n = W < 640 ? 20 : 34;
     for (let i = 0; i < n; i++) {
-      const y0 = cy + (Math.random() - .5) * H * 0.85;
-      const y1 = cy + (Math.random() - .5) * H * 0.85;
+      const f = i / (n - 1);
       filaments.push({
-        x0: -W * 0.1, y0,
-        x1: W * 1.1, y1,
-        c1x: cx - rx * (0.3 + Math.random() * 0.8), c1y: cy + (Math.random() - .5) * H * 0.7,
-        c2x: cx + rx * (0.3 + Math.random() * 0.8), c2y: cy + (Math.random() - .5) * H * 0.7,
-        amp: 6 + Math.random() * 20,
-        sp: 0.04 + Math.random() * 0.11,
+        // spread the resting heights across the frame, densest near the core
+        y0: cy + (f - .5) * H * 1.05 + (Math.random() - .5) * 40,
+        amp: 14 + Math.random() * 46,
+        freq: 0.6 + Math.random() * 1.5,
+        sp: 0.05 + Math.random() * 0.13,
         ph: Math.random() * Math.PI * 2,
-        a: 0.04 + Math.random() * 0.08,
+        a: 0.10 + Math.random() * 0.26,
+        w: 0.7 + Math.random() * 1.4,
+        swirl: (Math.random() < .5 ? -1 : 1) * (0.5 + Math.random() * 0.85),
+        gold: Math.random() < 0.05,   // the flow is cyan; gold is a rare accent
       });
     }
   }
@@ -668,21 +775,42 @@
   }
 
   function drawFilaments(t) {
-    ctx.lineWidth = 1;
+    const SEGS = 96;                        // enough that the swirl stays curved
+    const reach = Math.max(rx, ry) * 1.5;   // how far the core bends the flow
+
     for (const f of filaments) {
-      const w = Math.sin(t * f.sp + f.ph) * f.amp;
+      const drift = Math.sin(t * f.sp + f.ph) * f.amp;
       ctx.beginPath();
-      ctx.moveTo(f.x0, f.y0 + w);
-      ctx.bezierCurveTo(f.c1x, f.c1y + w, f.c2x, f.c2y - w, f.x1, f.y1 - w);
-      // fade the strands out at the edges so they read as passing through the core
-      const g = ctx.createLinearGradient(f.x0, 0, f.x1, 0);
-      g.addColorStop(0, rgba(COL.blue, 0));
-      g.addColorStop(.28, rgba(COL.blue, f.a));
-      g.addColorStop(.5, rgba(COL.blue, f.a * 1.7));
-      g.addColorStop(.72, rgba(COL.blue, f.a));
-      g.addColorStop(1, rgba(COL.blue, 0));
+      for (let i = 0; i <= SEGS; i++) {
+        const p = i / SEGS;
+        let x = -W * 0.08 + p * W * 1.16;
+        let y = f.y0 + drift + Math.sin(p * Math.PI * f.freq + f.ph + t * f.sp * 1.6) * f.amp;
+
+        // swirl: near the core, push each point tangentially around it so the
+        // ribbon wraps the orb instead of running straight through
+        const dx = x - cx, dy = y - cy;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < reach) {
+          // smoothstep falloff — a squared one kinks where it meets the edge
+          const k = 1 - d / reach;
+          const pull = k * k * (3 - 2 * k) * f.swirl;
+          x += (-dy / d) * pull * coreR * 1.5;
+          y += (dx / d) * pull * coreR * 1.5;
+        }
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      const hue = f.gold ? COL.gold : COL.cyan;
+      if (f.gold) ctx.globalAlpha = 0.55;
+      const g = ctx.createLinearGradient(0, 0, W, 0);
+      g.addColorStop(0, rgba(hue, 0));
+      g.addColorStop(.22, rgba(hue, f.a * .8));
+      g.addColorStop(.5, rgba(hue, f.a));
+      g.addColorStop(.78, rgba(hue, f.a * .8));
+      g.addColorStop(1, rgba(hue, 0));
       ctx.strokeStyle = g;
+      ctx.lineWidth = f.w;
       ctx.stroke();
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -765,13 +893,21 @@
     const breathe = 1 + Math.sin(t * 0.45) * 0.015 + voice.level * 0.06;
     const R = coreR * breathe;
 
+    // settle the flow field behind the orb so it reads as a clean sphere
+    const clear = ctx.createRadialGradient(cx, cy, R * 0.7, cx, cy, R * 2.0);
+    clear.addColorStop(0, 'rgba(4,20,42,.92)');
+    clear.addColorStop(.6, 'rgba(4,20,42,.45)');
+    clear.addColorStop(1, 'rgba(4,20,42,0)');
+    ctx.fillStyle = clear;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 2.0, 0, 7); ctx.fill();
+
     // outer bloom
-    const g = ctx.createRadialGradient(cx, cy, R * 0.15, cx, cy, R * 2.3);
-    g.addColorStop(0, rgba(COL.gold, .30));
-    g.addColorStop(.35, rgba(COL.gold, .10));
+    const g = ctx.createRadialGradient(cx, cy, R * 0.15, cx, cy, R * 2.6);
+    g.addColorStop(0, rgba(COL.gold, .42));
+    g.addColorStop(.32, rgba(COL.gold, .13));
     g.addColorStop(1, 'rgba(255,194,26,0)');
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(cx, cy, R * 2.3, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, R * 2.6, 0, 7); ctx.fill();
 
     // inner fill
     const g2 = ctx.createRadialGradient(cx - R * .2, cy - R * .25, R * .05, cx, cy, R);
@@ -1101,6 +1237,8 @@
   }
 
   function applyProxyMode() {
+    document.getElementById('link-mode').textContent = 'Cloud';
+    document.getElementById('link-dot').classList.add('on');
     document.getElementById('cfg-direct').hidden = true;
     document.getElementById('cfg-proxy').hidden = !proxy.needsCode;
     document.querySelector('#cfg .note').textContent = proxy.needsCode
@@ -1164,7 +1302,24 @@
   const answerEl = document.getElementById('answer');
   const cfgEl = document.getElementById('cfg');
 
-  function setState(s) { voice.state = s; if (s !== 'listening' && s !== 'speaking') voice.target = 0; }
+  const statePill = document.getElementById('state-pill');
+  const stateText = document.getElementById('state-text');
+  const micLabel = document.getElementById('mic-label');
+
+  const STATE_COPY = {
+    listening: 'Listening — tap to stop',
+    thinking: 'Thinking…',
+    speaking: 'Speaking — tap to stop',
+  };
+
+  function setState(s) {
+    voice.state = s;
+    if (s !== 'listening' && s !== 'speaking') voice.target = 0;
+    statePill.classList.toggle('on', s !== 'idle');
+    if (s !== 'idle') stateText.textContent = STATE_COPY[s];
+    micBtn.classList.toggle('live', s === 'listening');
+    micLabel.textContent = s === 'listening' ? 'Listening' : 'Voice on';
+  }
 
   function showAnswer(heard, body, isError) {
     answerEl.innerHTML = '';
@@ -1271,7 +1426,6 @@
     recog.onstart = () => {
       clearTimeout(watchdog);
       listening = true;
-      micBtn.classList.add('rec');
       setState('listening');
       startMeter();
     };
@@ -1310,9 +1464,9 @@
   function stopListening() {
     clearTimeout(watchdog);
     listening = false;
-    micBtn.classList.remove('rec');
     stopMeter();
     if (voice.state === 'listening') setState('idle');
+    else { micBtn.classList.remove('live'); micLabel.textContent = 'Voice on'; }
     // clear the handle before aborting — abort() re-fires onend, which lands
     // back here, and a non-null recog would abort in a loop
     const r = recog;
@@ -1510,9 +1664,36 @@
     if (e.key === 'Enter') { e.preventDefault(); send(askInput.value.trim()); }
   });
 
+  // the pill is the stop control for whatever Apex is currently doing
+  statePill.addEventListener('click', () => {
+    if (listening) stopListening();
+    stopSpeaking();
+    if (inflight) inflight.abort();
+    setState('idle');
+  });
+
+  const chatBar = document.getElementById('chatbar');
+  document.getElementById('chat-toggle').addEventListener('click', () => {
+    const open = chatBar.classList.toggle('on');
+    if (open) askInput.focus();
+  });
+
+  document.getElementById('new-chat').addEventListener('click', () => {
+    history.length = 0;
+    stopSpeaking();
+    if (inflight) inflight.abort();
+    if (listening) stopListening();
+    answerEl.classList.remove('on');
+    answerEl.innerHTML = '';
+    askInput.value = '';
+    setState('idle');
+    NODES.forEach(n => { n.glow = 0; });
+    select(null);
+  });
+
   function paintWho() {
     whoChip.textContent = cfg.provider === 'claude' ? 'Claude' : 'GPT';
-    whoChip.classList.toggle('gpt', cfg.provider === 'gpt');
+    whoChip.classList.toggle('gold', cfg.provider === 'claude');
   }
   whoChip.addEventListener('click', () => {
     cfg.provider = cfg.provider === 'claude' ? 'gpt' : 'claude';
@@ -1576,7 +1757,7 @@
     document.getElementById('clock').textContent = `${p(d.getHours())}:${p(d.getMinutes())}`;
     document.getElementById('date').textContent = d.toLocaleDateString(undefined, {
       weekday: 'short', day: 'numeric', month: 'short',
-    });
+    }).toUpperCase();
     const h = d.getHours();
     const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
     document.getElementById('greet').textContent = `Good ${part} — facility online`;
