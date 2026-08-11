@@ -1,0 +1,21 @@
+# Cloudflare Worker that hosts the ops brain and proxies Apex's model calls.
+# Deploy steps are in the "Hosting Apex" section of README.md.
+
+name = "greenwave-apex"
+main = "worker/index.js"
+compatibility_date = "2026-06-01"
+
+# brain/ is served as static assets; the Worker only handles /api/*.
+[assets]
+directory = "./brain"
+binding = "ASSETS"
+
+# Secrets are NOT set here — they would end up in git. Set them with:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put OPENAI_API_KEY      (optional)
+#   npx wrangler secret put APEX_ACCESS_CODE    (recommended — gates the URL)
+#
+# Non-secret overrides can go here if you want a different model:
+# [vars]
+# CLAUDE_MODEL = "claude-opus-5"
+# GPT_MODEL = "gpt-5"

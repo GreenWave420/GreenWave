@@ -64,12 +64,48 @@ To use it:
    `python3 -m http.server -d brain`.
 2. Click the gear and paste an Anthropic and/or OpenAI API key.
 
-> ⚠️ **Key handling.** There is no server in this project — the page calls the
-> provider directly from the browser, and your key is stored in that browser's
+> ⚠️ **Key handling in local mode.** Opened this way there is no server — the page
+> calls the provider directly from the browser and your key sits in that browser's
 > localStorage. Use a key issued for this purpose that you can revoke, and don't
-> enter one on a shared or public machine. Speech recognition also sends audio to
-> the browser vendor's service. If Apex is going on a shared floor terminal, put a
-> small proxy in front of it and hold the key server-side instead.
+> enter one on a shared machine. Speech recognition also sends audio to the browser
+> vendor's service. For anything shared, host it instead (below) — the key then
+> stays server-side and viewers never see it.
+
+### Hosting Apex
+
+`worker/` holds a small proxy that serves the page *and* relays Apex's questions,
+keeping the API key in a server secret. The page detects it automatically: the key
+fields disappear from settings and it asks for an access code instead. Two ways to
+deploy it, sharing the same handler in `worker/apex.js`.
+
+**Cloudflare Pages — no terminal required.** Everything below is done in a browser,
+so this works from a phone.
+
+1. In the Cloudflare dashboard: **Workers & Pages → Create → Pages → Connect to Git**,
+   pick this repository and branch.
+2. Build settings: framework preset **None**, build command **blank**, build output
+   directory **`brain`**. Save and deploy.
+3. **Settings → Environment variables**, add and encrypt:
+   - `ANTHROPIC_API_KEY` — your `sk-ant-…` key
+   - `APEX_ACCESS_CODE` — any passphrase (see the warning below)
+   - optional: `OPENAI_API_KEY`, `CLAUDE_MODEL`, `GPT_MODEL`
+4. Redeploy so the variables take effect, open the `*.pages.dev` URL, tap the gear
+   and enter the access code once.
+
+**Cloudflare Worker — with a terminal.**
+
+```
+npx wrangler login
+npx wrangler secret put ANTHROPIC_API_KEY
+npx wrangler secret put APEX_ACCESS_CODE
+npx wrangler deploy
+```
+
+> ⚠️ **Set an access code.** Without `APEX_ACCESS_CODE` the URL is an open relay to
+> your API key — anyone who finds it can spend your credits. With it set, every
+> request must carry the code or the proxy returns 401. The proxy also pins the
+> model, caps output at 1024 tokens, and trims history to 12 turns, so a single
+> leaked page can't run away with the bill.
 
 ### Detailed SOPs (`/sops`)
 | SOP | File |

@@ -326,18 +326,24 @@
       Apex answers with Claude or GPT. Requests go straight from this browser to the
       provider — there is no server in between.
     </p>
-    <p class="warn">
-      Keys are stored in this browser's localStorage and are visible to any script on
-      this page. Use a key scoped to this purpose, and don't add one on a shared machine.
-    </p>
-    <label for="k-claude">Anthropic API key</label>
-    <input id="k-claude" type="password" placeholder="sk-ant-…" autocomplete="off">
-    <label for="m-claude">Claude model</label>
-    <input id="m-claude" type="text" autocomplete="off">
-    <label for="k-openai">OpenAI API key</label>
-    <input id="k-openai" type="password" placeholder="sk-…" autocomplete="off">
-    <label for="m-openai">GPT model</label>
-    <input id="m-openai" type="text" autocomplete="off">
+    <div id="cfg-direct">
+      <p class="warn">
+        Keys are stored in this browser's localStorage and are visible to any script on
+        this page. Use a key scoped to this purpose, and don't add one on a shared machine.
+      </p>
+      <label for="k-claude">Anthropic API key</label>
+      <input id="k-claude" type="password" placeholder="sk-ant-…" autocomplete="off">
+      <label for="m-claude">Claude model</label>
+      <input id="m-claude" type="text" autocomplete="off">
+      <label for="k-openai">OpenAI API key</label>
+      <input id="k-openai" type="password" placeholder="sk-…" autocomplete="off">
+      <label for="m-openai">GPT model</label>
+      <input id="m-openai" type="text" autocomplete="off">
+    </div>
+    <div id="cfg-proxy" hidden>
+      <label for="k-code">Access code</label>
+      <input id="k-code" type="password" placeholder="the code you set on the server" autocomplete="off">
+    </div>
     <div class="row">
       <button id="cfg-clear">Clear keys</button>
       <button class="primary" id="cfg-save">Save</button>
@@ -1071,7 +1077,43 @@
     provider: 'claude',
     claudeKey: '', claudeModel: 'claude-opus-5',
     openaiKey: '', openaiModel: 'gpt-5',
+    accessCode: '',
   }, readCfg());
+
+  // When the page is served by the Cloudflare Worker in worker/, the model keys
+  // live server-side and the browser never sees one. Detected at startup; the
+  // static/local copy falls back to keys entered here.
+  const proxy = { on: false, needsCode: false, providers: {} };
+
+  async function detectProxy() {
+    try {
+      const res = await fetch('api/health', { cache: 'no-store' });
+      if (!res.ok) return;
+      const info = await res.json();
+      if (!info || info.proxy !== true) return;
+      proxy.on = true;
+      proxy.needsCode = Boolean(info.needsCode);
+      proxy.providers = info.providers || {};
+      applyProxyMode();
+    } catch {
+      // no proxy here — direct-from-browser mode
+    }
+  }
+
+  function applyProxyMode() {
+    document.getElementById('cfg-direct').hidden = true;
+    document.getElementById('cfg-proxy').hidden = !proxy.needsCode;
+    document.querySelector('#cfg .note').textContent = proxy.needsCode
+      ? 'Apex is served through this site\'s own proxy — the API keys stay on the server. ' +
+        'Enter the access code to use it.'
+      : 'Apex is served through this site\'s own proxy. The API keys stay on the server; ' +
+        'nothing is stored in this browser.';
+    // fall back to whichever provider the server actually has a key for
+    if (!proxy.providers[cfg.provider]) {
+      const available = Object.keys(proxy.providers).find(k => proxy.providers[k]);
+      if (available) { cfg.provider = available; paintWho(); writeCfg(); }
+    }
+  }
 
   function readCfg() {
     try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch { return {}; }
@@ -1305,10 +1347,22 @@
     return new Error(`${res.status} ${res.statusText}${detail ? ' — ' + detail : ''}`);
   }
 
+  /** Same SSE shape either way — the proxy relays the provider's stream verbatim. */
+  function viaProxy(which, messages, signal) {
+    return fetch('api/' + which, {
+      method: 'POST', signal,
+      headers: Object.assign(
+        { 'content-type': 'application/json' },
+        proxy.needsCode ? { 'x-apex-code': cfg.accessCode } : {},
+      ),
+      body: JSON.stringify({ system: facilityBrief(), messages }),
+    });
+  }
+
   // Claude: Messages API, streamed. Adaptive thinking is on by default on
   // Opus 5; low effort keeps a spoken reply quick.
   async function* askClaude(messages, signal) {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = proxy.on ? await viaProxy('claude', messages, signal) : await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', signal,
       headers: {
         'content-type': 'application/json',
@@ -1341,7 +1395,7 @@
 
   // GPT: Chat Completions, streamed.
   async function* askGPT(messages, signal) {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = proxy.on ? await viaProxy('gpt', messages, signal) : await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST', signal,
       headers: {
         'content-type': 'application/json',
@@ -1382,10 +1436,20 @@
     askInput.value = '';
     stopSpeaking();
 
-    const key = cfg.provider === 'claude' ? cfg.claudeKey : cfg.openaiKey;
-    if (!key) {
-      showAnswer(text, 'No API key set for ' + (cfg.provider === 'claude' ? 'Claude' : 'GPT') +
-        '. Open settings (the gear) and add one.', true);
+    const label = cfg.provider === 'claude' ? 'Claude' : 'GPT';
+    if (proxy.on) {
+      if (!proxy.providers[cfg.provider]) {
+        showAnswer(text, 'This server has no ' + label + ' key configured. Switch models with ' +
+          'the chip, or set the key as a Worker secret.', true);
+        return;
+      }
+      if (proxy.needsCode && !cfg.accessCode) {
+        showAnswer(text, 'This Apex needs an access code. Open settings (the gear) and enter it.', true);
+        openCfg();
+        return;
+      }
+    } else if (!(cfg.provider === 'claude' ? cfg.claudeKey : cfg.openaiKey)) {
+      showAnswer(text, 'No API key set for ' + label + '. Open settings (the gear) and add one.', true);
       openCfg();
       return;
     }
@@ -1461,11 +1525,12 @@
     claudeModel: document.getElementById('m-claude'),
     openaiKey: document.getElementById('k-openai'),
     openaiModel: document.getElementById('m-openai'),
+    accessCode: document.getElementById('k-code'),
   };
   function openCfg() {
     Object.entries(fields).forEach(([k, el]) => { el.value = cfg[k]; });
     cfgEl.classList.add('on');
-    fields.claudeKey.focus();
+    (proxy.on ? fields.accessCode : fields.claudeKey).focus();
   }
   document.getElementById('cfg-open').addEventListener('click', openCfg);
   document.getElementById('cfg-save').addEventListener('click', () => {
@@ -1474,10 +1539,12 @@
     cfgEl.classList.remove('on');
   });
   document.getElementById('cfg-clear').addEventListener('click', () => {
-    cfg.claudeKey = ''; cfg.openaiKey = '';
+    cfg.claudeKey = ''; cfg.openaiKey = ''; cfg.accessCode = '';
     Object.entries(fields).forEach(([k, el]) => { el.value = cfg[k]; });
     writeCfg();
   });
+
+  detectProxy();
   cfgEl.addEventListener('click', e => { if (e.target === cfgEl) cfgEl.classList.remove('on'); });
 
   // ------------------------------------------------------------- hud text
