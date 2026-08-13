@@ -1370,6 +1370,22 @@
   const synth = window.speechSynthesis;
   let speakQueue = [], speakingNow = false;
 
+  // iOS Safari only allows speechSynthesis to start inside a synchronous user
+  // gesture — a speak() call made later, after an awaited fetch stream, is
+  // silently dropped. Fire one near-silent utterance directly inside the tap
+  // that starts a conversation so the engine is "unlocked" for every speak()
+  // that follows during the rest of the session.
+  let speechUnlocked = false;
+  function unlockSpeech() {
+    if (speechUnlocked || !synth) return;
+    speechUnlocked = true;
+    try {
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      synth.speak(u);
+    } catch { /* best effort */ }
+  }
+
   function enqueueSpeech(text) {
     const clean = text.replace(/\s+/g, ' ').trim();
     if (!clean || !synth) return;
@@ -1684,9 +1700,16 @@
   }
 
   // ---- wiring --------------------------------------------------------------
-  micBtn.addEventListener('click', () => (listening ? stopListening() : startListening()));
+  micBtn.addEventListener('click', () => {
+    unlockSpeech();
+    listening ? stopListening() : startListening();
+  });
   askInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); send(askInput.value.trim()); }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      unlockSpeech();
+      send(askInput.value.trim());
+    }
   });
 
   // the pill is the stop control for whatever Apex is currently doing
