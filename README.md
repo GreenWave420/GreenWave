@@ -118,6 +118,32 @@ npx wrangler deploy
 
 ---
 
+## Operating model (Finance node)
+
+Internal only. NZD, excl. GST, three founders. Shared across every version of the
+model: five harvests a year, 44 kg dry per harvest at $4.00/g — $176,000 a
+harvest, $880,000 a year; company tax at 28%; 60% of after-tax profit distributed,
+40% retained. Build fit-out, plant and licence were founder-funded and sit outside
+operating costs.
+
+**Two versions of the cost side are in circulation and they do not agree.** The
+Finance node on the ops brain carries the newer set.
+
+| | Monthly cost | Cost / harvest | Profit / harvest | After tax | Per founder | Cost / g |
+|---|---|---|---|---|---|---|
+| **Newer** — *Monthly Costs & Projected Income*, *One Company* | $33,635 | $75,080 | $100,920 | $341,330 | $68,300 | $1.71 |
+| **Older** — *Financial Breakdown*, *Investor One-Pager*, *Supply Activity Projection* | $28,600 | $62,950 | $113,050 | $386,800 | $77,400 | $1.43 |
+
+The newer set describes itself as the correction: wages are grossed up to $18,850
+for PAYE, ACC and KiwiSaver (the older set uses a flat $14,000), nutrients are
+priced at $3,816 a run "replacing the earlier $25k/yr estimate", and a $2,250/yr
+Medsafe licence line is added. Every one of those moves the cost up.
+
+The gap is roughly **$9,100 per founder per year**. Until the three older
+documents are updated, quote the newer set and say so — do not blend the two.
+
+---
+
 ## Standard target ranges (edit to your setup)
 
 These are **placeholder defaults** — confirm against your strains, genetics and

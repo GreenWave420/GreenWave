@@ -390,7 +390,7 @@
 </div>
 
 <div class="hud" id="hud-tr">
-  <div class="sysline">Nodes <b id="nodecount">18</b> · Live <b id="livecount">6</b></div>
+  <div class="sysline">Nodes <b id="nodecount">19</b> · Live <b id="livecount">6</b></div>
   <div class="sysline">Link <b>nominal</b></div>
 </div>
 
@@ -502,6 +502,11 @@
       desc: 'Stock tanks mixed to schedule. pH and EC verified before every irrigation event.',
       read: [['Solution pH','',5.98,.04],['Feed EC','mS/cm',2.1,.03],['Tank level','%',72,.4]] },
 
+    { name: 'Finance', angle:  63, r: .74, status: 'online',
+      owner: 'Founders', sop: 'README.md',
+      desc: 'Operating model at 5 harvests/year. Two versions of the numbers are in circulation — the board carries the newer, grossed-up set.',
+      read: [['Monthly cost','',0,0,'$33,635'],['Cost per gram','',0,0,'$1.71'],['Profit / harvest','',0,0,'$100,920']] },
+
     { name: 'Irrigation', angle:  75, r: .88, status: 'live',
       owner: 'CT', sop: 'sops/mother-plant-maintenance.md',
       desc: 'Six shots/day in flower. Runoff EC checked daily against feed to track build-up.',
@@ -585,6 +590,7 @@
     ['Propagation','Genetics'], ['Veg Rooms','Flower Rooms'], ['Flower Rooms','Climate'],
     ['Sanitation','Housekeeping'], ['Waste','Sanitation'], ['Harvest','Inventory'],
     ['Mothers','Veg Rooms'], ['IPM','Veg Rooms'],
+    ['Harvest','Finance'], ['Finance','Inventory'],
   ];
 
   const byName = new Map(NODES.map(n => [n.name, n]));
@@ -1275,8 +1281,27 @@
       'facility (licensed medicinal cultivation, aligned to GACP and GMP hygiene',
       'expectations, New Zealand Medsafe context).',
       '',
-      'Live board — the 18 domains on the operator\'s wall display:',
+      `Live board — the ${NODES.length} domains on the operator's wall display:`,
       rows,
+      '',
+      'Commercial model (NZD, excl. GST, 3 founders). Shared across every version:',
+      'five harvests a year, 44 kg dry per harvest at $4.00/g — $176,000 a harvest,',
+      '$880,000 a year. Company tax 28%. Sixty percent of after-tax profit is',
+      'distributed, forty percent retained.',
+      '',
+      'Two versions of the cost side are in circulation and they do not agree.',
+      'The newer set (Monthly Costs & Projected Income; One Company) runs $33,635 a',
+      'month, $75,080 a harvest, $100,920 profit a harvest, $341,330 after tax,',
+      '$68,300 per founder, $1.71 a gram. It grosses wages up to $18,850 for PAYE,',
+      'ACC and KiwiSaver, prices nutrients at $3,816 a run — explicitly replacing an',
+      'earlier $25k/yr estimate — and adds a $2,250/yr Medsafe licence line.',
+      'The older set (Financial Breakdown; Investor One-Pager; Supply Activity',
+      'Projection) runs $28,600 a month, $62,950 a harvest, $113,050 profit a',
+      'harvest, $386,800 after tax, $77,400 per founder, $1.43 a gram.',
+      'Quote the newer set by default and say the older documents have not been',
+      'updated yet. The gap is about $9,100 per founder per year. Do not blend the',
+      'two. Build fit-out, plant and licence were founder-funded and sit outside',
+      'operating costs.',
       '',
       'Standing targets: mothers/veg 22-26C day, 55-65% RH; early flower 24-26C,',
       '50-60% RH; late flower 20-24C, 40-50% RH; drying 16-20C, 55-62% RH.',
