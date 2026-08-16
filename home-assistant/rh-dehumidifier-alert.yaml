@@ -1,0 +1,68 @@
+# GreenWave — "Dehumidifiers All Off" alert
+#
+# Replaces the old alert, which fired whenever room RH sat above the control
+# setpoint with all four dehumidifier relays off. In practice the room spends a
+# lot of time in the 60s with the relays idle, so the alert repeated hourly and
+# stopped meaning anything.
+#
+# This version only pages when RH is genuinely out of spec: above 75 % for a
+# sustained 10 minutes, with all four relays off. It fires ONCE per excursion
+# and re-arms only after RH drops back below 72 % (2 % hysteresis stops it
+# flapping around the threshold).
+#
+# ---------------------------------------------------------------------------
+# BEFORE PASTING THIS IN, CHECK TWO THINGS:
+#
+#   1. Entity IDs. The ones below are the expected slugs for "GW Room RH
+#      Averaged" and "GW Dehumidifier Relay 1-4". Confirm them in
+#      Developer Tools → States.
+#   2. The notify service. Replace notify.mobile_app_your_phone with whatever
+#      the existing automation already uses for your handset.
+# ---------------------------------------------------------------------------
+
+- id: greenwave_rh_dehumidifiers_all_off
+  alias: "Alert — Dehumidifiers all off while RH high"
+  description: >-
+    Critical push when grow room RH holds above 75 % for 10 minutes with every
+    dehumidifier relay off. One notification per excursion; re-arms below 72 %.
+  mode: single
+  max_exceeded: silent
+
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.gw_room_rh_averaged
+      above: 75
+      for: "00:10:00"
+
+  conditions:
+    # All four relays off — i.e. nothing is actually dehumidifying.
+    - condition: state
+      entity_id:
+        - switch.gw_dehumidifier_relay_1
+        - switch.gw_dehumidifier_relay_2
+        - switch.gw_dehumidifier_relay_3
+        - switch.gw_dehumidifier_relay_4
+      state: "off"
+
+  actions:
+    - action: notify.mobile_app_your_phone
+      data:
+        title: "🚨 Dehumidifiers All Off"
+        message: >-
+          RH is {{ states('sensor.gw_room_rh_averaged') }} % and ALL four
+          dehumidifier relays are off. Check power / relays / breaker.
+        data:
+          push:
+            interruption-level: critical
+            sound:
+              name: default
+              critical: 1
+              volume: 1.0
+
+    # Hold the automation open until the room recovers, so a single excursion
+    # cannot page repeatedly. Drop this block if you would rather have the
+    # alert able to re-fire the moment the trigger conditions are met again.
+    - wait_template: >-
+        {{ states('sensor.gw_room_rh_averaged') | float(0) < 72 }}
+      continue_on_timeout: true
+      timeout: "06:00:00"
