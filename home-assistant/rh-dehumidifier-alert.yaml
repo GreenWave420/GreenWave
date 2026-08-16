@@ -1,37 +1,55 @@
 # GreenWave — "Dehumidifiers All Off" alert
 #
-# Replaces the old alert, which fired whenever room RH sat above the control
-# setpoint with all four dehumidifier relays off. In practice the room spends a
-# lot of time in the 60s with the relays idle, so the alert repeated hourly and
-# stopped meaning anything.
+# The alert threshold follows the RH dial rather than sitting at a fixed
+# number: move the setpoint and the alarm point moves with it. It fires when
+# the room is `alarm_margin` above whatever the dial is set to, for a sustained
+# 10 minutes, with all four dehumidifier relays off.
 #
-# This version only pages when RH is genuinely out of spec: above 75 % for a
-# sustained 10 minutes, with all four relays off. It fires ONCE per excursion
-# and re-arms only after RH drops back below 72 % (2 % hysteresis stops it
-# flapping around the threshold).
+# One page per excursion. Re-arms once RH comes back to within 5 % of the dial.
 #
 # ---------------------------------------------------------------------------
-# BEFORE PASTING THIS IN, CHECK TWO THINGS:
+# THREE THINGS TO FILL IN BEFORE SAVING:
 #
-#   1. Entity IDs. The ones below are the expected slugs for "GW Room RH
-#      Averaged" and "GW Dehumidifier Relay 1-4". Confirm them in
-#      Developer Tools → States.
-#   2. The notify service. Replace notify.mobile_app_your_phone with whatever
+#   1. rh_setpoint — the entity ID of your RH dial. It is a number.* or
+#      input_number.* entity, so find it in Developer Tools → States by
+#      filtering on "number.". This is the only value that must be right for
+#      the automation to work at all.
+#   2. rh_sensor and the four relay entity IDs — expected slugs are below,
+#      confirm them in Developer Tools → States.
+#   3. The notify service — replace notify.mobile_app_your_phone with whatever
 #      the existing automation already uses for your handset.
 # ---------------------------------------------------------------------------
 
 - id: greenwave_rh_dehumidifiers_all_off
-  alias: "Alert — Dehumidifiers all off while RH high"
+  alias: "Alert — Dehumidifiers all off while RH above setpoint"
   description: >-
-    Critical push when grow room RH holds above 75 % for 10 minutes with every
-    dehumidifier relay off. One notification per excursion; re-arms below 72 %.
+    Critical push when grow room RH holds well above the RH setpoint for
+    10 minutes with every dehumidifier relay off. Threshold tracks the dial.
   mode: single
   max_exceeded: silent
 
+  variables:
+    # <<< SET THIS to your RH dial's entity ID >>>
+    rh_setpoint: number.gw_rh_setpoint
+    rh_sensor: sensor.gw_room_rh_averaged
+
+    # How far above the dial the room has to sit before this is a fault rather
+    # than the control loop doing its job. Lower it for a tighter alarm; 0 will
+    # page on every normal overshoot, which is what made the old alert useless.
+    alarm_margin: 8
+
+    # Re-arm band. RH must fall back to within this much of the dial before the
+    # alert can fire again. Must be smaller than alarm_margin.
+    rearm_margin: 5
+
+    # Fallback if the dial is unavailable at evaluation time.
+    setpoint_fallback: 60
+
   triggers:
-    - trigger: numeric_state
-      entity_id: sensor.gw_room_rh_averaged
-      above: 75
+    - trigger: template
+      value_template: >-
+        {{ states(rh_sensor) | float(0)
+           > (states(rh_setpoint) | float(setpoint_fallback) + alarm_margin) }}
       for: "00:10:00"
 
   conditions:
@@ -49,8 +67,9 @@
       data:
         title: "🚨 Dehumidifiers All Off"
         message: >-
-          RH is {{ states('sensor.gw_room_rh_averaged') }} % and ALL four
-          dehumidifier relays are off. Check power / relays / breaker.
+          RH is {{ states(rh_sensor) }} % against a setpoint of
+          {{ states(rh_setpoint) }} % and ALL four dehumidifier relays are off.
+          Check power / relays / breaker.
         data:
           push:
             interruption-level: critical
@@ -60,9 +79,9 @@
               volume: 1.0
 
     # Hold the automation open until the room recovers, so a single excursion
-    # cannot page repeatedly. Drop this block if you would rather have the
-    # alert able to re-fire the moment the trigger conditions are met again.
+    # cannot page repeatedly.
     - wait_template: >-
-        {{ states('sensor.gw_room_rh_averaged') | float(0) < 72 }}
+        {{ states(rh_sensor) | float(0)
+           < (states(rh_setpoint) | float(setpoint_fallback) + rearm_margin) }}
       continue_on_timeout: true
       timeout: "06:00:00"
