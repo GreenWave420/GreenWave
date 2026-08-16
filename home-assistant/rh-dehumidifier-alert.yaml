@@ -1,15 +1,11 @@
 # GreenWave — "Dehumidifiers All Off" alert
 #
-# The alert threshold follows the RH dial rather than sitting at a fixed
-# number: move the setpoint and the alarm point moves with it.
+# Fires when grow room RH holds above 75 % for a sustained 10 minutes with all
+# four dehumidifier relays off. One page per excursion; re-arms below 72 %.
 #
-# The dial is the "Grow Room Dehumidifiers" card on the Environment dashboard —
-# a humidifier entity whose target RH lives in its `humidity` attribute, which
-# is what the templates below read. At a setpoint of 68 % the alert fires above
-# 76 % and re-arms below 73 %.
-#
-# Fires when the room holds 8 % above the dial for a sustained 10 minutes with
-# all four dehumidifier relays off. One page per excursion.
+# The 75 % is a fixed number, deliberately independent of the RH dial. It is a
+# fault threshold — "dehumidification has failed" — not a control setpoint. If
+# you move the dial, this does not move with it.
 #
 # ---------------------------------------------------------------------------
 # TO FILL IN BEFORE SAVING:
@@ -18,28 +14,20 @@
 #     the existing automation already uses for your handset.
 #   - The four relay entity IDs are expected slugs; confirm them in
 #     Developer Tools → States.
-#
-# The margins are the "+ 8" in the trigger and the "+ 5" in the wait_template
-# at the bottom. They are inlined rather than shared as variables because
-# Home Assistant does not expose automation variables to template triggers.
-# If you change one, change the other, and keep the wait_template's margin the
-# smaller of the two or the alert will flap.
 # ---------------------------------------------------------------------------
 
 - id: greenwave_rh_dehumidifiers_all_off
-  alias: "Alert — Dehumidifiers all off while RH above setpoint"
+  alias: "Alert — Dehumidifiers all off while RH high"
   description: >-
-    Critical push when grow room RH holds 8 % above the dial for 10 minutes
-    with every dehumidifier relay off. Threshold tracks the setpoint.
+    Critical push when grow room RH holds above 75 % for 10 minutes with every
+    dehumidifier relay off.
   mode: single
   max_exceeded: silent
 
   triggers:
-    - trigger: template
-      value_template: >-
-        {{ states('sensor.gw_room_rh_averaged') | float(0)
-           > (state_attr('humidifier.grow_room_dehumidifiers', 'humidity')
-              | float(60)) + 8 }}
+    - trigger: numeric_state
+      entity_id: sensor.gw_room_rh_averaged
+      above: 75
       for: "00:10:00"
 
   conditions:
@@ -57,10 +45,8 @@
       data:
         title: "🚨 Dehumidifiers All Off"
         message: >-
-          RH is {{ states('sensor.gw_room_rh_averaged') }} % against a setpoint
-          of {{ state_attr('humidifier.grow_room_dehumidifiers', 'humidity') }} %
-          and ALL four dehumidifier relays are off.
-          Check power / relays / breaker.
+          RH is {{ states('sensor.gw_room_rh_averaged') }} % and ALL four
+          dehumidifier relays are off. Check power / relays / breaker.
         data:
           push:
             interruption-level: critical
@@ -72,8 +58,6 @@
     # Hold the automation open until the room recovers, so a single excursion
     # cannot page repeatedly.
     - wait_template: >-
-        {{ states('sensor.gw_room_rh_averaged') | float(0)
-           < (state_attr('humidifier.grow_room_dehumidifiers', 'humidity')
-              | float(60)) + 5 }}
+        {{ states('sensor.gw_room_rh_averaged') | float(0) < 72 }}
       continue_on_timeout: true
       timeout: "06:00:00"
