@@ -1,55 +1,45 @@
 # GreenWave — "Dehumidifiers All Off" alert
 #
 # The alert threshold follows the RH dial rather than sitting at a fixed
-# number: move the setpoint and the alarm point moves with it. It fires when
-# the room is `alarm_margin` above whatever the dial is set to, for a sustained
-# 10 minutes, with all four dehumidifier relays off.
+# number: move the setpoint and the alarm point moves with it.
 #
-# One page per excursion. Re-arms once RH comes back to within 5 % of the dial.
+# The dial is the "Grow Room Dehumidifiers" card on the Environment dashboard —
+# a humidifier entity whose target RH lives in its `humidity` attribute, which
+# is what the templates below read. At a setpoint of 68 % the alert fires above
+# 76 % and re-arms below 73 %.
+#
+# Fires when the room holds 8 % above the dial for a sustained 10 minutes with
+# all four dehumidifier relays off. One page per excursion.
 #
 # ---------------------------------------------------------------------------
-# THREE THINGS TO FILL IN BEFORE SAVING:
+# TO FILL IN BEFORE SAVING:
 #
-#   1. rh_setpoint — the entity ID of your RH dial. It is a number.* or
-#      input_number.* entity, so find it in Developer Tools → States by
-#      filtering on "number.". This is the only value that must be right for
-#      the automation to work at all.
-#   2. rh_sensor and the four relay entity IDs — expected slugs are below,
-#      confirm them in Developer Tools → States.
-#   3. The notify service — replace notify.mobile_app_your_phone with whatever
-#      the existing automation already uses for your handset.
+#   - The notify service — replace notify.mobile_app_your_phone with whatever
+#     the existing automation already uses for your handset.
+#   - The four relay entity IDs are expected slugs; confirm them in
+#     Developer Tools → States.
+#
+# The margins are the "+ 8" in the trigger and the "+ 5" in the wait_template
+# at the bottom. They are inlined rather than shared as variables because
+# Home Assistant does not expose automation variables to template triggers.
+# If you change one, change the other, and keep the wait_template's margin the
+# smaller of the two or the alert will flap.
 # ---------------------------------------------------------------------------
 
 - id: greenwave_rh_dehumidifiers_all_off
   alias: "Alert — Dehumidifiers all off while RH above setpoint"
   description: >-
-    Critical push when grow room RH holds well above the RH setpoint for
-    10 minutes with every dehumidifier relay off. Threshold tracks the dial.
+    Critical push when grow room RH holds 8 % above the dial for 10 minutes
+    with every dehumidifier relay off. Threshold tracks the setpoint.
   mode: single
   max_exceeded: silent
-
-  variables:
-    # <<< SET THIS to your RH dial's entity ID >>>
-    rh_setpoint: number.gw_rh_setpoint
-    rh_sensor: sensor.gw_room_rh_averaged
-
-    # How far above the dial the room has to sit before this is a fault rather
-    # than the control loop doing its job. Lower it for a tighter alarm; 0 will
-    # page on every normal overshoot, which is what made the old alert useless.
-    alarm_margin: 8
-
-    # Re-arm band. RH must fall back to within this much of the dial before the
-    # alert can fire again. Must be smaller than alarm_margin.
-    rearm_margin: 5
-
-    # Fallback if the dial is unavailable at evaluation time.
-    setpoint_fallback: 60
 
   triggers:
     - trigger: template
       value_template: >-
-        {{ states(rh_sensor) | float(0)
-           > (states(rh_setpoint) | float(setpoint_fallback) + alarm_margin) }}
+        {{ states('sensor.gw_room_rh_averaged') | float(0)
+           > (state_attr('humidifier.grow_room_dehumidifiers', 'humidity')
+              | float(60)) + 8 }}
       for: "00:10:00"
 
   conditions:
@@ -67,8 +57,9 @@
       data:
         title: "🚨 Dehumidifiers All Off"
         message: >-
-          RH is {{ states(rh_sensor) }} % against a setpoint of
-          {{ states(rh_setpoint) }} % and ALL four dehumidifier relays are off.
+          RH is {{ states('sensor.gw_room_rh_averaged') }} % against a setpoint
+          of {{ state_attr('humidifier.grow_room_dehumidifiers', 'humidity') }} %
+          and ALL four dehumidifier relays are off.
           Check power / relays / breaker.
         data:
           push:
@@ -81,7 +72,8 @@
     # Hold the automation open until the room recovers, so a single excursion
     # cannot page repeatedly.
     - wait_template: >-
-        {{ states(rh_sensor) | float(0)
-           < (states(rh_setpoint) | float(setpoint_fallback) + rearm_margin) }}
+        {{ states('sensor.gw_room_rh_averaged') | float(0)
+           < (state_attr('humidifier.grow_room_dehumidifiers', 'humidity')
+              | float(60)) + 5 }}
       continue_on_timeout: true
       timeout: "06:00:00"
